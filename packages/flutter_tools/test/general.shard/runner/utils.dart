@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
-
 import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/reporting/reporting.dart';
 import 'package:flutter_tools/src/runner/flutter_command.dart';
@@ -36,7 +34,7 @@ class DummyFlutterCommand extends FlutterCommand {
 
   @override
   Future<FlutterCommandResult> runCommand() async {
-    return commandFunction == null ? null : await commandFunction();
+    return commandFunction == null ? FlutterCommandResult.fail() : await commandFunction();
   }
 }
 

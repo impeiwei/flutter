@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
-
+import 'package:file/memory.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/io.dart';
-import 'package:flutter_tools/src/base/logger.dart';
 import 'package:flutter_tools/src/build_info.dart';
 import 'package:flutter_tools/src/compile.dart';
 import 'package:flutter_tools/src/device.dart';
@@ -21,69 +19,29 @@ import '../src/context.dart';
 import '../src/mocks.dart';
 
 void main() {
-  group('cold attach', () {
-    MockResidentCompiler residentCompiler;
-    BufferLogger mockLogger;
+  testUsingContext('Exits with code 2 when when HttpException is thrown '
+    'during VM service connection', () async {
+    final MockResidentCompiler residentCompiler = MockResidentCompiler();
+    final MockDevice mockDevice = MockDevice();
+    when(mockDevice.supportsHotReload).thenReturn(true);
+    when(mockDevice.supportsHotRestart).thenReturn(false);
+    when(mockDevice.targetPlatform).thenAnswer((Invocation _) async => TargetPlatform.tester);
+    when(mockDevice.sdkNameAndVersion).thenAnswer((Invocation _) async => 'Android 10');
 
-    setUp(() {
-      mockLogger = BufferLogger();
-      residentCompiler = MockResidentCompiler();
-    });
+    final List<FlutterDevice> devices = <FlutterDevice>[
+      TestFlutterDevice(
+        device: mockDevice,
+        generator: residentCompiler,
+        exception: const HttpException('Connection closed before full header was received, '
+            'uri = http://127.0.0.1:63394/5ZmLv8A59xY=/ws'),
+      ),
+    ];
 
-    testUsingContext('Prints message when HttpException is thrown - 1', () async {
-      final MockDevice mockDevice = MockDevice();
-      when(mockDevice.supportsHotReload).thenReturn(true);
-      when(mockDevice.supportsHotRestart).thenReturn(false);
-      when(mockDevice.targetPlatform).thenAnswer((Invocation _) async => TargetPlatform.tester);
-      when(mockDevice.sdkNameAndVersion).thenAnswer((Invocation _) async => 'Android 10');
-
-      final List<FlutterDevice> devices = <FlutterDevice>[
-        TestFlutterDevice(
-          device: mockDevice,
-          generator: residentCompiler,
-          exception: const HttpException('Connection closed before full header was received, '
-              'uri = http://127.0.0.1:63394/5ZmLv8A59xY=/ws'),
-        ),
-      ];
-
-      final int exitCode = await ColdRunner(devices,
-        debuggingOptions: DebuggingOptions.enabled(BuildInfo.debug),
-      ).attach();
-      expect(exitCode, 2);
-      expect(mockLogger.statusText, contains('If you are using an emulator running Android Q Beta, '
-          'consider using an emulator running API level 29 or lower.'));
-      expect(mockLogger.statusText, contains('Learn more about the status of this issue on '
-          'https://issuetracker.google.com/issues/132325318'));
-    }, overrides: <Type, Generator>{
-      Logger: () => mockLogger,
-    });
-
-    testUsingContext('Prints message when HttpException is thrown - 2', () async {
-      final MockDevice mockDevice = MockDevice();
-      when(mockDevice.supportsHotReload).thenReturn(true);
-      when(mockDevice.supportsHotRestart).thenReturn(false);
-      when(mockDevice.targetPlatform).thenAnswer((Invocation _) async => TargetPlatform.tester);
-      when(mockDevice.sdkNameAndVersion).thenAnswer((Invocation _) async => 'Android 10');
-
-      final List<FlutterDevice> devices = <FlutterDevice>[
-        TestFlutterDevice(
-          device: mockDevice,
-          generator: residentCompiler,
-          exception: const HttpException(', uri = http://127.0.0.1:63394/5ZmLv8A59xY=/ws'),
-        ),
-      ];
-
-      final int exitCode = await ColdRunner(devices,
-        debuggingOptions: DebuggingOptions.enabled(BuildInfo.debug),
-      ).attach();
-      expect(exitCode, 2);
-      expect(mockLogger.statusText, contains('If you are using an emulator running Android Q Beta, '
-          'consider using an emulator running API level 29 or lower.'));
-      expect(mockLogger.statusText, contains('Learn more about the status of this issue on '
-          'https://issuetracker.google.com/issues/132325318'));
-    }, overrides: <Type, Generator>{
-      Logger: () => mockLogger,
-    });
+    final int exitCode = await ColdRunner(devices,
+      debuggingOptions: DebuggingOptions.enabled(BuildInfo.debug),
+      target: 'main.dart',
+    ).attach();
+    expect(exitCode, 2);
   });
 
   group('cleanupAtFinish()', () {
@@ -104,6 +62,7 @@ void main() {
 
       await ColdRunner(devices,
         debuggingOptions: DebuggingOptions.enabled(BuildInfo.debug),
+        target: 'main.dart',
       ).cleanupAtFinish();
 
       verify(mockDevice1.dispose());
@@ -114,25 +73,6 @@ void main() {
   });
 
   group('cold run', () {
-    BufferLogger mockLogger;
-
-    setUp(() {
-      mockLogger = BufferLogger();
-    });
-
-    testUsingContext('returns 1 if not prebuilt mode & mainPath does not exist', () async {
-      final MockDevice mockDevice = MockDevice();
-      final MockFlutterDevice mockFlutterDevice = MockFlutterDevice();
-      when(mockFlutterDevice.device).thenReturn(mockDevice);
-      final List<FlutterDevice> devices = <FlutterDevice>[mockFlutterDevice];
-      final int result = await ColdRunner(devices).run();
-      expect(result, 1);
-      expect(mockLogger.errorText, matches(r'Tried to run .*, but that file does not exist\.'));
-      expect(mockLogger.errorText, matches(r'Consider using the -t option to specify the Dart file to start\.'));
-    }, overrides: <Type, Generator>{
-      Logger: () => mockLogger,
-    });
-
     testUsingContext('calls runCold on attached device', () async {
       final MockDevice mockDevice = MockDevice();
       final MockFlutterDevice mockFlutterDevice = MockFlutterDevice();
@@ -142,24 +82,23 @@ void main() {
           route: anyNamed('route')
       )).thenAnswer((Invocation invocation) => Future<int>.value(1));
       final List<FlutterDevice> devices = <FlutterDevice>[mockFlutterDevice];
-      final MockFile applicationBinary = MockFile();
+      final File applicationBinary = MemoryFileSystem.test().file('binary');
       final int result = await ColdRunner(
         devices,
         applicationBinary: applicationBinary,
         debuggingOptions: DebuggingOptions.enabled(BuildInfo.debug),
+        target: 'main.dart',
       ).run();
+
       expect(result, 1);
       verify(mockFlutterDevice.runCold(
           coldRunner: anyNamed('coldRunner'),
           route: anyNamed('route'),
       ));
-    }, overrides: <Type, Generator>{
-      Logger: () => mockLogger,
     });
   });
 }
 
-class MockFile extends Mock implements File {}
 class MockFlutterDevice extends Mock implements FlutterDevice {}
 class MockDevice extends Mock implements Device {
   MockDevice() {
@@ -173,7 +112,7 @@ class TestFlutterDevice extends FlutterDevice {
     @required this.exception,
     @required ResidentCompiler generator,
   })  : assert(exception != null),
-        super(device, buildMode: BuildMode.debug, generator: generator, trackWidgetCreation: false);
+        super(device, buildInfo: BuildInfo.debug, generator: generator);
 
   /// The exception to throw when the connect method is called.
   final Exception exception;
@@ -183,6 +122,14 @@ class TestFlutterDevice extends FlutterDevice {
     ReloadSources reloadSources,
     Restart restart,
     CompileExpression compileExpression,
+    GetSkSLMethod getSkSLMethod,
+    PrintStructuredErrorLogMethod printStructuredErrorLogMethod,
+    bool disableDds = false,
+    bool disableServiceAuthCodes = false,
+    int hostVmServicePort,
+    int ddsPort,
+    bool ipv6 = false,
+    bool allowExistingDdsInstance = false,
   }) async {
     throw exception;
   }

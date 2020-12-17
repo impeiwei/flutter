@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,7 +26,7 @@ void main() {
     // The color scheme values are guaranteed to be non null since the default
     // [ThemeData] creates it with [ColorScheme.fromSwatch].
     expect(_getRawMaterialButton(tester).fillColor, ThemeData().colorScheme.secondary);
-    expect(_getRichText(tester).text.style.color, ThemeData().colorScheme.onSecondary);
+    expect(_getRichText(tester).text.style!.color, ThemeData().colorScheme.onSecondary);
 
     // These defaults come directly from the [FloatingActionButton].
     expect(_getRawMaterialButton(tester).elevation, 6);
@@ -64,7 +65,7 @@ void main() {
     ));
 
     expect(_getRawMaterialButton(tester).fillColor, backgroundColor);
-    expect(_getRichText(tester).text.style.color, foregroundColor);
+    expect(_getRichText(tester).text.style!.color, foregroundColor);
     expect(_getRawMaterialButton(tester).elevation, elevation);
     expect(_getRawMaterialButton(tester).disabledElevation, disabledElevation);
     expect(_getRawMaterialButton(tester).highlightElevation, highlightElevation);
@@ -109,30 +110,12 @@ void main() {
     ));
 
     expect(_getRawMaterialButton(tester).fillColor, backgroundColor);
-    expect(_getRichText(tester).text.style.color, foregroundColor);
+    expect(_getRichText(tester).text.style!.color, foregroundColor);
     expect(_getRawMaterialButton(tester).elevation, elevation);
     expect(_getRawMaterialButton(tester).disabledElevation, disabledElevation);
     expect(_getRawMaterialButton(tester).highlightElevation, highlightElevation);
     expect(_getRawMaterialButton(tester).shape, shape);
     expect(_getRawMaterialButton(tester).splashColor, splashColor);
-  });
-
-  testWidgets('FloatingActionButton foreground color uses iconAccentTheme if no widget or widget theme color is specified', (WidgetTester tester) async {
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        floatingActionButton: Theme(
-          data: ThemeData().copyWith(
-            accentIconTheme: const IconThemeData(color: Color(0xFACEFACE)),
-          ),
-          child: FloatingActionButton(
-            onPressed: () { },
-            child: const Icon(Icons.add),
-          ),
-        ),
-      ),
-    ));
-
-    expect(_getRichText(tester).text.style.color, const Color(0xFACEFACE));
   });
 
   testWidgets('FloatingActionButton uses a custom shape when specified in the theme', (WidgetTester tester) async {

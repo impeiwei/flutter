@@ -97,7 +97,7 @@ abstract class InheritedModel<T> extends InheritedWidget {
   /// Creates an inherited widget that supports dependencies qualified by
   /// "aspects", i.e. a descendant widget can indicate that it should
   /// only be rebuilt if a specific aspect of the model changes.
-  const InheritedModel({ Key key, Widget child }) : super(key: key, child: child);
+  const InheritedModel({ Key? key, required Widget child }) : super(key: key, child: child);
 
   @override
   InheritedModelElement<T> createElement() => InheritedModelElement<T>(this);
@@ -120,18 +120,18 @@ abstract class InheritedModel<T> extends InheritedWidget {
   // The [result] will be a list of all of context's type T ancestors concluding
   // with the one that supports the specified model [aspect].
   static void _findModels<T extends InheritedModel<Object>>(BuildContext context, Object aspect, List<InheritedElement> results) {
-    final InheritedElement model = context.getElementForInheritedWidgetOfExactType<T>();
+    final InheritedElement? model = context.getElementForInheritedWidgetOfExactType<T>();
     if (model == null)
       return;
 
     results.add(model);
 
     assert(model.widget is T);
-    final T modelWidget = model.widget;
+    final T modelWidget = model.widget as T;
     if (modelWidget.isSupportedAspect(aspect))
       return;
 
-    Element modelParent;
+    Element? modelParent;
     model.visitAncestorElements((Element ancestor) {
       modelParent = ancestor;
       return false;
@@ -139,7 +139,7 @@ abstract class InheritedModel<T> extends InheritedWidget {
     if (modelParent == null)
       return;
 
-    _findModels<T>(modelParent, aspect, results);
+    _findModels<T>(modelParent!, aspect, results);
   }
 
   /// Makes [context] dependent on the specified [aspect] of an [InheritedModel]
@@ -157,7 +157,7 @@ abstract class InheritedModel<T> extends InheritedWidget {
   /// `context.dependOnInheritedWidgetOfExactType<T>()`.
   ///
   /// If no ancestor of type T exists, null is returned.
-  static T inheritFrom<T extends InheritedModel<Object>>(BuildContext context, { Object aspect }) {
+  static T? inheritFrom<T extends InheritedModel<Object>>(BuildContext context, { Object? aspect }) {
     if (aspect == null)
       return context.dependOnInheritedWidgetOfExactType<T>();
 
@@ -170,8 +170,8 @@ abstract class InheritedModel<T> extends InheritedWidget {
     }
 
     final InheritedElement lastModel = models.last;
-    for (InheritedElement model in models) {
-      final T value = context.dependOnInheritedElement(model, aspect: aspect);
+    for (final InheritedElement model in models) {
+      final T value = context.dependOnInheritedElement(model, aspect: aspect) as T;
       if (model == lastModel)
         return value;
     }
@@ -187,11 +187,11 @@ class InheritedModelElement<T> extends InheritedElement {
   InheritedModelElement(InheritedModel<T> widget) : super(widget);
 
   @override
-  InheritedModel<T> get widget => super.widget;
+  InheritedModel<T> get widget => super.widget as InheritedModel<T>;
 
   @override
-  void updateDependencies(Element dependent, Object aspect) {
-    final Set<T> dependencies = getDependencies(dependent);
+  void updateDependencies(Element dependent, Object? aspect) {
+    final Set<T>? dependencies = getDependencies(dependent) as Set<T>?;
     if (dependencies != null && dependencies.isEmpty)
       return;
 
@@ -199,13 +199,13 @@ class InheritedModelElement<T> extends InheritedElement {
       setDependencies(dependent, HashSet<T>());
     } else {
       assert(aspect is T);
-      setDependencies(dependent, (dependencies ?? HashSet<T>())..add(aspect));
+      setDependencies(dependent, (dependencies ?? HashSet<T>())..add(aspect as T));
     }
   }
 
   @override
   void notifyDependent(InheritedModel<T> oldWidget, Element dependent) {
-    final Set<T> dependencies = getDependencies(dependent);
+    final Set<T>? dependencies = getDependencies(dependent) as Set<T>?;
     if (dependencies == null)
       return;
     if (dependencies.isEmpty || widget.updateShouldNotifyDependent(oldWidget, dependencies))

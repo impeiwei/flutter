@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
-
 import 'package:meta/meta.dart';
 
 import '../android/gradle_errors.dart';
 import '../base/context.dart';
 import '../base/file_system.dart';
 import '../build_info.dart';
+import '../globals.dart' as globals;
 import '../project.dart';
-import 'android_sdk.dart';
 import 'gradle.dart';
 
 /// The builder in the current context.
@@ -29,6 +27,7 @@ abstract class AndroidBuilder {
     @required Set<AndroidBuildInfo> androidBuildInfo,
     @required String target,
     @required String outputDirectoryPath,
+    @required String buildNumber,
   });
 
   /// Builds an APK artifact.
@@ -57,20 +56,22 @@ class _AndroidBuilderImpl extends AndroidBuilder {
     @required Set<AndroidBuildInfo> androidBuildInfo,
     @required String target,
     @required String outputDirectoryPath,
+    @required String buildNumber,
   }) async {
     try {
       Directory outputDirectory =
-        fs.directory(outputDirectoryPath ?? project.android.buildDirectory);
+        globals.fs.directory(outputDirectoryPath ?? project.android.buildDirectory);
       if (project.isModule) {
         // Module projects artifacts are located in `build/host`.
         outputDirectory = outputDirectory.childDirectory('host');
       }
-      for (AndroidBuildInfo androidBuildInfo in androidBuildInfo) {
+      for (final AndroidBuildInfo androidBuildInfo in androidBuildInfo) {
         await buildGradleAar(
           project: project,
           androidBuildInfo: androidBuildInfo,
           target: target,
           outputDirectory: outputDirectory,
+          buildNumber: buildNumber,
         );
       }
       printHowToConsumeAar(
@@ -80,9 +81,12 @@ class _AndroidBuilderImpl extends AndroidBuilder {
           }).toSet(),
         androidPackage: project.manifest.androidPackage,
         repoDirectory: getRepoDirectory(outputDirectory),
+        buildNumber: buildNumber,
+        logger: globals.logger,
+        fileSystem: globals.fs,
       );
     } finally {
-      androidSdk.reinitialize();
+      globals.androidSdk?.reinitialize();
     }
   }
 
@@ -102,7 +106,7 @@ class _AndroidBuilderImpl extends AndroidBuilder {
         localGradleErrors: gradleErrors,
       );
     } finally {
-      androidSdk.reinitialize();
+      globals.androidSdk?.reinitialize();
     }
   }
 
@@ -122,7 +126,7 @@ class _AndroidBuilderImpl extends AndroidBuilder {
         localGradleErrors: gradleErrors,
       );
     } finally {
-      androidSdk.reinitialize();
+      globals.androidSdk?.reinitialize();
     }
   }
 }

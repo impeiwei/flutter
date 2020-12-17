@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_devicelab/framework/framework.dart';
+import 'package:flutter_devicelab/framework/task_result.dart';
 import 'package:flutter_devicelab/framework/utils.dart';
 import 'package:path/path.dart' as path;
 
@@ -40,7 +40,7 @@ Future<void> main() async {
         print('^ not sure what to do with that line ^');
       }
     }
-    await for (String entry in analysis.stderr.transform<String>(utf8.decoder).transform<String>(const LineSplitter())) {
+    await for (final String entry in analysis.stderr.transform<String>(utf8.decoder).transform<String>(const LineSplitter())) {
       print('analyzer stderr: $entry');
       if (entry.contains(' (ran in ') && !sawFinalLine) {
         // ignore this line once

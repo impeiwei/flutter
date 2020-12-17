@@ -18,14 +18,14 @@ import '_isolates_io.dart'
 typedef ComputeCallback<Q, R> = FutureOr<R> Function(Q message);
 
 // The signature of [compute].
-typedef _ComputeImpl = Future<R> Function<Q, R>(ComputeCallback<Q, R> callback, Q message, { String debugLabel });
+typedef _ComputeImpl = Future<R> Function<Q, R>(ComputeCallback<Q, R> callback, Q message, { String? debugLabel });
 
 /// Spawn an isolate, run `callback` on that isolate, passing it `message`, and
 /// (eventually) return the value returned by `callback`.
 ///
 /// This is useful for operations that take longer than a few milliseconds, and
 /// which would therefore risk skipping frames. For tasks that will only take a
-/// few milliseconds, consider [scheduleTask] instead.
+/// few milliseconds, consider [SchedulerBinding.scheduleTask] instead.
 ///
 /// {@template flutter.foundation.compute.types}
 /// `Q` is the type of the message that kicks off the computation.

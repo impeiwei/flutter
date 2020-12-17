@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
 import 'dart:developer';
 import 'dart:typed_data';
 
@@ -14,12 +13,14 @@ import 'package:flutter/services.dart';
 
 import 'box.dart';
 import 'debug.dart';
+import 'mouse_tracking.dart';
 import 'object.dart';
 import 'view.dart';
 
 export 'package:flutter/gestures.dart' show HitTestResult;
 
 // Examples can assume:
+// // @dart = 2.9
 // dynamic context;
 
 /// The glue between the render tree and the Flutter engine.
@@ -44,11 +45,14 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
     assert(renderView != null);
     addPersistentFrameCallback(_handlePersistentFrameCallback);
     initMouseTracker();
+    if (kIsWeb) {
+      addPostFrameCallback(_handleWebFirstFrame);
+    }
   }
 
   /// The current [RendererBinding], if one has been created.
-  static RendererBinding get instance => _instance;
-  static RendererBinding _instance;
+  static RendererBinding? get instance => _instance;
+  static RendererBinding? _instance;
 
   @override
   void initServiceExtensions() {
@@ -56,6 +60,17 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
 
     assert(() {
       // these service extensions only work in debug mode
+      registerBoolServiceExtension(
+        name: 'invertOversizedImages',
+        getter: () async => debugInvertOversizedImages,
+        setter: (bool value) async {
+          if (debugInvertOversizedImages != value) {
+            debugInvertOversizedImages = value;
+            return _forceRepaint();
+          }
+          return Future<void>.value();
+        },
+      );
       registerBoolServiceExtension(
         name: 'debugPaint',
         getter: () async => debugPaintSizeEnabled,
@@ -142,23 +157,28 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
   ///
   /// Called automatically when the binding is created.
   void initRenderView() {
-    assert(renderView == null);
+    assert(!_debugIsRenderViewInitialized);
+    assert(() {
+      _debugIsRenderViewInitialized = true;
+      return true;
+    }());
     renderView = RenderView(configuration: createViewConfiguration(), window: window);
     renderView.prepareInitialFrame();
   }
+  bool _debugIsRenderViewInitialized = false;
 
   /// The object that manages state about currently connected mice, for hover
   /// notification.
-  MouseTracker get mouseTracker => _mouseTracker;
-  MouseTracker _mouseTracker;
+  MouseTracker get mouseTracker => _mouseTracker!;
+  MouseTracker? _mouseTracker;
 
   /// The render tree's owner, which maintains dirty state for layout,
-  /// composite, paint, and accessibility semantics
+  /// composite, paint, and accessibility semantics.
   PipelineOwner get pipelineOwner => _pipelineOwner;
-  PipelineOwner _pipelineOwner;
+  late PipelineOwner _pipelineOwner;
 
   /// The render tree that's attached to the output surface.
-  RenderView get renderView => _pipelineOwner.rootNode;
+  RenderView get renderView => _pipelineOwner.rootNode! as RenderView;
   /// Sets the given [RenderView] object (which must not be null), and its tree, to
   /// be the new render tree to display. The previous tree, if any, is detached.
   set renderView(RenderView value) {
@@ -168,7 +188,7 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
 
   /// Called when the system metrics change.
   ///
-  /// See [Window.onMetricsChanged].
+  /// See [dart:ui.PlatformDispatcher.onMetricsChanged].
   @protected
   void handleMetricsChanged() {
     assert(renderView != null);
@@ -178,7 +198,7 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
 
   /// Called when the platform text scale factor changes.
   ///
-  /// See [Window.onTextScaleFactorChanged].
+  /// See [dart:ui.PlatformDispatcher.onTextScaleFactorChanged].
   @protected
   void handleTextScaleFactorChanged() { }
 
@@ -189,15 +209,7 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
   /// it causes the widget to be automatically rebuilt when the brightness
   /// changes.
   ///
-  /// {@tool sample}
-  /// Querying [Window.platformBrightness].
-  ///
-  /// ```dart
-  /// final Brightness brightness = WidgetsBinding.instance.window.platformBrightness;
-  /// ```
-  /// {@end-tool}
-  ///
-  /// {@tool sample}
+  /// {@tool snippet}
   /// Querying [MediaQuery] directly. Preferred.
   ///
   /// ```dart
@@ -205,7 +217,15 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
   /// ```
   /// {@end-tool}
   ///
-  /// {@tool sample}
+  /// {@tool snippet}
+  /// Querying [PlatformDispatcher.platformBrightness].
+  ///
+  /// ```dart
+  /// final Brightness brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+  /// ```
+  /// {@end-tool}
+  ///
+  /// {@tool snippet}
   /// Querying [MediaQueryData].
   ///
   /// ```dart
@@ -214,7 +234,7 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
   /// ```
   /// {@end-tool}
   ///
-  /// See [Window.onPlatformBrightnessChanged].
+  /// See [dart:ui.PlatformDispatcher.onPlatformBrightnessChanged].
   @protected
   void handlePlatformBrightnessChanged() { }
 
@@ -236,16 +256,28 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
     );
   }
 
-  SemanticsHandle _semanticsHandle;
+  SemanticsHandle? _semanticsHandle;
 
   /// Creates a [MouseTracker] which manages state about currently connected
   /// mice, for hover notification.
   ///
   /// Used by testing framework to reinitialize the mouse tracker between tests.
   @visibleForTesting
-  void initMouseTracker([MouseTracker tracker]) {
+  void initMouseTracker([MouseTracker? tracker]) {
     _mouseTracker?.dispose();
-    _mouseTracker = tracker ?? MouseTracker(pointerRouter, renderView.hitTestMouseTrackers);
+    _mouseTracker = tracker ?? MouseTracker();
+  }
+
+  @override // from GestureBinding
+  void dispatchEvent(PointerEvent event, HitTestResult? hitTestResult) {
+    if (hitTestResult != null ||
+        event is PointerAddedEvent ||
+        event is PointerRemovedEvent) {
+      assert(event.position != null);
+      _mouseTracker!.updateWithEvent(event,
+          () => hitTestResult ?? renderView.hitTestMouseTrackers(event.position));
+    }
+    super.dispatchEvent(event, hitTestResult);
   }
 
   void _handleSemanticsEnabledChanged() {
@@ -263,7 +295,13 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
     }
   }
 
-  void _handleSemanticsAction(int id, SemanticsAction action, ByteData args) {
+  void _handleWebFirstFrame(Duration _) {
+    assert(kIsWeb);
+    const MethodChannel methodChannel = MethodChannel('flutter/service_worker');
+    methodChannel.invokeMethod<void>('first-frame');
+  }
+
+  void _handleSemanticsAction(int id, SemanticsAction action, ByteData? args) {
     _pipelineOwner.semanticsOwner?.performAction(
       id,
       action,
@@ -281,6 +319,80 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
 
   void _handlePersistentFrameCallback(Duration timeStamp) {
     drawFrame();
+    _scheduleMouseTrackerUpdate();
+  }
+
+  bool _debugMouseTrackerUpdateScheduled = false;
+  void _scheduleMouseTrackerUpdate() {
+    assert(!_debugMouseTrackerUpdateScheduled);
+    assert(() {
+      _debugMouseTrackerUpdateScheduled = true;
+      return true;
+    }());
+    SchedulerBinding.instance!.addPostFrameCallback((Duration duration) {
+      assert(_debugMouseTrackerUpdateScheduled);
+      assert(() {
+        _debugMouseTrackerUpdateScheduled = false;
+        return true;
+      }());
+      _mouseTracker!.updateAllDevices(renderView.hitTestMouseTrackers);
+    });
+  }
+
+  int _firstFrameDeferredCount = 0;
+  bool _firstFrameSent = false;
+
+  /// Whether frames produced by [drawFrame] are sent to the engine.
+  ///
+  /// If false the framework will do all the work to produce a frame,
+  /// but the frame is never sent to the engine to actually appear on screen.
+  ///
+  /// See also:
+  ///
+  ///  * [deferFirstFrame], which defers when the first frame is sent to the
+  ///    engine.
+  bool get sendFramesToEngine => _firstFrameSent || _firstFrameDeferredCount == 0;
+
+  /// Tell the framework to not send the first frames to the engine until there
+  /// is a corresponding call to [allowFirstFrame].
+  ///
+  /// Call this to perform asynchronous initialization work before the first
+  /// frame is rendered (which takes down the splash screen). The framework
+  /// will still do all the work to produce frames, but those frames are never
+  /// sent to the engine and will not appear on screen.
+  ///
+  /// Calling this has no effect after the first frame has been sent to the
+  /// engine.
+  void deferFirstFrame() {
+    assert(_firstFrameDeferredCount >= 0);
+    _firstFrameDeferredCount += 1;
+  }
+
+  /// Called after [deferFirstFrame] to tell the framework that it is ok to
+  /// send the first frame to the engine now.
+  ///
+  /// For best performance, this method should only be called while the
+  /// [schedulerPhase] is [SchedulerPhase.idle].
+  ///
+  /// This method may only be called once for each corresponding call
+  /// to [deferFirstFrame].
+  void allowFirstFrame() {
+    assert(_firstFrameDeferredCount > 0);
+    _firstFrameDeferredCount -= 1;
+    // Always schedule a warm up frame even if the deferral count is not down to
+    // zero yet since the removal of a deferral may uncover new deferrals that
+    // are lower in the widget tree.
+    if (!_firstFrameSent)
+      scheduleWarmUpFrame();
+  }
+
+  /// Call this to pretend that no frames have been sent to the engine yet.
+  ///
+  /// This is useful for tests that want to call [deferFirstFrame] and
+  /// [allowFirstFrame] since those methods only have an effect if no frames
+  /// have been sent to the engine yet.
+  void resetFirstFrameSent() {
+    _firstFrameSent = false;
   }
 
   /// Pump the rendering pipeline to generate a frame.
@@ -291,11 +403,11 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
   /// Each frame consists of the following phases:
   ///
   /// 1. The animation phase: The [handleBeginFrame] method, which is registered
-  /// with [Window.onBeginFrame], invokes all the transient frame callbacks
-  /// registered with [scheduleFrameCallback], in registration order. This
-  /// includes all the [Ticker] instances that are driving [AnimationController]
-  /// objects, which means all of the active [Animation] objects tick at this
-  /// point.
+  /// with [PlatformDispatcher.onBeginFrame], invokes all the transient frame
+  /// callbacks registered with [scheduleFrameCallback], in registration order.
+  /// This includes all the [Ticker] instances that are driving
+  /// [AnimationController] objects, which means all of the active [Animation]
+  /// objects tick at this point.
   ///
   /// 2. Microtasks: After [handleBeginFrame] returns, any microtasks that got
   /// scheduled by transient frame callbacks get to run. This typically includes
@@ -303,9 +415,9 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
   /// completed this frame.
   ///
   /// After [handleBeginFrame], [handleDrawFrame], which is registered with
-  /// [Window.onDrawFrame], is called, which invokes all the persistent frame
-  /// callbacks, of which the most notable is this method, [drawFrame], which
-  /// proceeds as follows:
+  /// [dart:ui.PlatformDispatcher.onDrawFrame], is called, which invokes all the
+  /// persistent frame callbacks, of which the most notable is this method,
+  /// [drawFrame], which proceeds as follows:
   ///
   /// 3. The layout phase: All the dirty [RenderObject]s in the system are laid
   /// out (see [RenderObject.performLayout]). See [RenderObject.markNeedsLayout]
@@ -324,8 +436,7 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
   /// sent to the GPU.
   ///
   /// 7. The semantics phase: All the dirty [RenderObject]s in the system have
-  /// their semantics updated (see [RenderObject.semanticsAnnotator]). This
-  /// generates the [SemanticsNode] tree. See
+  /// their semantics updated. This generates the [SemanticsNode] tree. See
   /// [RenderObject.markNeedsSemanticsUpdate] for further details on marking an
   /// object dirty for semantics.
   ///
@@ -344,14 +455,17 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
     pipelineOwner.flushLayout();
     pipelineOwner.flushCompositingBits();
     pipelineOwner.flushPaint();
-    renderView.compositeFrame(); // this sends the bits to the GPU
-    pipelineOwner.flushSemantics(); // this also sends the semantics to the OS.
+    if (sendFramesToEngine) {
+      renderView.compositeFrame(); // this sends the bits to the GPU
+      pipelineOwner.flushSemantics(); // this also sends the semantics to the OS.
+      _firstFrameSent = true;
+    }
   }
 
   @override
   Future<void> performReassemble() async {
     await super.performReassemble();
-    Timeline.startSync('Dirty Render Tree', arguments: timelineWhitelistArguments);
+    Timeline.startSync('Dirty Render Tree', arguments: timelineArgumentsIndicatingLandmarkEvent);
     try {
       renderView.reassemble();
     } finally {
@@ -364,29 +478,31 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
   @override
   void hitTest(HitTestResult result, Offset position) {
     assert(renderView != null);
+    assert(result != null);
+    assert(position != null);
     renderView.hitTest(result, position: position);
     super.hitTest(result, position);
   }
 
   Future<void> _forceRepaint() {
-    RenderObjectVisitor visitor;
+    late RenderObjectVisitor visitor;
     visitor = (RenderObject child) {
       child.markNeedsPaint();
       child.visitChildren(visitor);
     };
-    instance?.renderView?.visitChildren(visitor);
+    instance?.renderView.visitChildren(visitor);
     return endOfFrame;
   }
 }
 
 /// Prints a textual representation of the entire render tree.
 void debugDumpRenderTree() {
-  debugPrint(RendererBinding.instance?.renderView?.toStringDeep() ?? 'Render tree unavailable.');
+  debugPrint(RendererBinding.instance?.renderView.toStringDeep() ?? 'Render tree unavailable.');
 }
 
 /// Prints a textual representation of the entire layer tree.
 void debugDumpLayerTree() {
-  debugPrint(RendererBinding.instance?.renderView?.debugLayer?.toStringDeep() ?? 'Layer tree unavailable.');
+  debugPrint(RendererBinding.instance?.renderView.debugLayer?.toStringDeep() ?? 'Layer tree unavailable.');
 }
 
 /// Prints a textual representation of the entire semantics tree.
@@ -396,7 +512,7 @@ void debugDumpLayerTree() {
 /// The order in which the children of a [SemanticsNode] will be printed is
 /// controlled by the [childOrder] parameter.
 void debugDumpSemanticsTree(DebugSemanticsDumpOrder childOrder) {
-  debugPrint(RendererBinding.instance?.renderView?.debugSemantics?.toStringDeep(childOrder: childOrder) ?? 'Semantics not collected.');
+  debugPrint(RendererBinding.instance?.renderView.debugSemantics?.toStringDeep(childOrder: childOrder) ?? 'Semantics not collected.');
 }
 
 /// A concrete binding for applications that use the Rendering framework
@@ -406,14 +522,12 @@ void debugDumpSemanticsTree(DebugSemanticsDumpOrder childOrder) {
 /// rendering layer directly. If you are writing to a higher-level
 /// library, such as the Flutter Widgets library, then you would use
 /// that layer's binding.
-///
-/// See also [BindingBase].
-class RenderingFlutterBinding extends BindingBase with GestureBinding, ServicesBinding, SchedulerBinding, SemanticsBinding, PaintingBinding, RendererBinding {
+class RenderingFlutterBinding extends BindingBase with GestureBinding, SchedulerBinding, ServicesBinding, SemanticsBinding, PaintingBinding, RendererBinding {
   /// Creates a binding for the rendering layer.
   ///
   /// The `root` render box is attached directly to the [renderView] and is
   /// given constraints that require it to fill the window.
-  RenderingFlutterBinding({ RenderBox root }) {
+  RenderingFlutterBinding({ RenderBox? root }) {
     assert(renderView != null);
     renderView.child = root;
   }

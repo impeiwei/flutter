@@ -25,7 +25,7 @@ void main() {
     focusNode.requestFocus();
     await tester.idle();
 
-    for (String platform in platforms) {
+    for (final String platform in platforms) {
       await tester.sendKeyEvent(LogicalKeyboardKey.shiftLeft, platform: platform);
       await tester.sendKeyEvent(LogicalKeyboardKey.shift, platform: platform);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyA, platform: platform);
@@ -36,7 +36,7 @@ void main() {
 
       expect(events.length, 8);
       for (int i = 0; i < events.length; ++i) {
-        final bool isEven = i % 2 == 0;
+        final bool isEven = i.isEven;
         if (isEven) {
           expect(events[i].runtimeType, equals(RawKeyDownEvent));
         } else {

@@ -6,7 +6,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart';
 
 class TestWidget extends StatefulWidget {
-  const TestWidget({ this.child, this.persistentState, this.syncedState });
+  const TestWidget({
+    Key? key,
+    required this.child,
+    required this.persistentState,
+    required this.syncedState,
+  }) : super(key: key);
 
   final Widget child;
   final int persistentState;
@@ -17,8 +22,8 @@ class TestWidget extends StatefulWidget {
 }
 
 class TestWidgetState extends State<TestWidget> {
-  int persistentState;
-  int syncedState;
+  late int persistentState;
+  late int syncedState;
   int updates = 0;
 
   @override
@@ -49,6 +54,7 @@ void main() {
         child: Container(
           child: TestWidget(
             persistentState: 1,
+            syncedState: 0,
             child: Container(),
           ),
         ),
@@ -65,6 +71,7 @@ void main() {
         child: Container(
           child: TestWidget(
             persistentState: 2,
+            syncedState: 0,
             child: Container(),
           ),
         ),
@@ -83,6 +90,7 @@ void main() {
         child: Container(
           child: TestWidget(
             persistentState: 10,
+            syncedState: 0,
             child: Container(),
           ),
         ),
@@ -98,6 +106,7 @@ void main() {
       Container(
         child: TestWidget(
           persistentState: 11,
+          syncedState: 0,
           child: Container(),
         ),
       ),

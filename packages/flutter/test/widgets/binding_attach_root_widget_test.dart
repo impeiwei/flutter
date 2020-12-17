@@ -11,13 +11,13 @@ import 'package:flutter/widgets.dart';
 
 void main() {
   test('attachRootWidget will schedule a frame', () async {
-    final WidgetsFlutterBinding binding = WidgetsFlutterBinding.ensureInitialized();
-    expect(SchedulerBinding.instance.hasScheduledFrame, isFalse);
+    final WidgetsFlutterBinding binding = WidgetsFlutterBinding.ensureInitialized() as WidgetsFlutterBinding;
+    expect(SchedulerBinding.instance!.hasScheduledFrame, isFalse);
     // Framework starts with detached statue. Sends resumed signal to enable frame.
-    final ByteData message = const StringCodec().encodeMessage('AppLifecycleState.resumed');
-    await ServicesBinding.instance.defaultBinaryMessenger.handlePlatformMessage('flutter/lifecycle', message, (_) { });
+    final ByteData message = const StringCodec().encodeMessage('AppLifecycleState.resumed')!;
+    await ServicesBinding.instance!.defaultBinaryMessenger.handlePlatformMessage('flutter/lifecycle', message, (_) { });
 
     binding.attachRootWidget(const Placeholder());
-    expect(SchedulerBinding.instance.hasScheduledFrame, isTrue);
+    expect(SchedulerBinding.instance!.hasScheduledFrame, isTrue);
   });
 }

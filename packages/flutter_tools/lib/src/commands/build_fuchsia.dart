@@ -2,24 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
+import 'package:meta/meta.dart';
 
 import '../base/common.dart';
-import '../base/file_system.dart';
-import '../base/platform.dart';
 import '../build_info.dart';
 import '../cache.dart';
+import '../features.dart';
 import '../fuchsia/fuchsia_build.dart';
 import '../fuchsia/fuchsia_pm.dart';
+import '../globals.dart' as globals;
 import '../project.dart';
 import '../runner/flutter_command.dart' show FlutterCommandResult;
 import 'build.dart';
 
 /// A command to build a Fuchsia target.
 class BuildFuchsiaCommand extends BuildSubCommand {
-  BuildFuchsiaCommand({bool verboseHelp = false}) {
+  BuildFuchsiaCommand({ @required bool verboseHelp }) {
+    addTreeShakeIconsFlag();
     usesTargetOption();
+    usesDartDefineOption();
     addBuildModeFlags(verboseHelp: verboseHelp);
+    addNullSafetyModeOptions(hide: !verboseHelp);
+    addEnableExperimentation(hide: !verboseHelp);
     argParser.addOption(
       'runner-source',
       help: 'The package source to use for the flutter_runner. '
@@ -54,21 +58,19 @@ class BuildFuchsiaCommand extends BuildSubCommand {
 
   @override
   Future<FlutterCommandResult> runCommand() async {
-    Cache.releaseLockEarly();
-    final BuildInfo buildInfo = getBuildInfo();
+    if (!featureFlags.isFuchsiaEnabled) {
+      throwToolExit(
+        '"build fuchsia" is currently disabled. See "flutter config" for more '
+        'information.'
+      );
+    }
+    final BuildInfo buildInfo = await getBuildInfo();
     final FlutterProject flutterProject = FlutterProject.current();
-    if (!platform.isLinux && !platform.isMacOS) {
+    if (!globals.platform.isLinux && !globals.platform.isMacOS) {
       throwToolExit('"build fuchsia" is only supported on Linux and MacOS hosts.');
     }
     if (!flutterProject.fuchsia.existsSync()) {
       throwToolExit('No Fuchsia project is configured.');
-    }
-    final String appName = flutterProject.fuchsia.project.manifest.appName;
-    final String cmxPath = fs.path.join(
-        flutterProject.fuchsia.meta.path, '$appName.cmx');
-    final File cmxFile = fs.file(cmxPath);
-    if (!cmxFile.existsSync()) {
-      throwToolExit('The Fuchsia build requires a .cmx file at $cmxPath for the app.');
     }
     await buildFuchsia(
       fuchsiaProject: flutterProject.fuchsia,
@@ -77,6 +79,6 @@ class BuildFuchsiaCommand extends BuildSubCommand {
       buildInfo: buildInfo,
       runnerPackageSource: stringArg('runner-source'),
     );
-    return null;
+    return FlutterCommandResult.success();
   }
 }

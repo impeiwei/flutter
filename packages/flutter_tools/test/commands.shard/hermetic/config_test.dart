@@ -7,12 +7,11 @@ import 'dart:convert';
 import 'package:args/command_runner.dart';
 import 'package:flutter_tools/src/android/android_sdk.dart';
 import 'package:flutter_tools/src/android/android_studio.dart';
-import 'package:flutter_tools/src/base/common.dart';
-import 'package:flutter_tools/src/base/config.dart';
 import 'package:flutter_tools/src/base/context.dart';
 import 'package:flutter_tools/src/build_info.dart';
 import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/commands/config.dart';
+import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:flutter_tools/src/reporting/reporting.dart';
 import 'package:flutter_tools/src/version.dart';
 import 'package:mockito/mockito.dart';
@@ -102,7 +101,7 @@ void main() {
       expect(() => commandRunner.run(<String>[
         'config',
         '--build-dir=/foo',
-      ]), throwsA(isInstanceOf<ToolExit>()));
+      ]), throwsToolExit());
       verifyNoAnalytics();
     }, overrides: <Type, Generator>{
       Usage: () => mockUsage,
@@ -120,19 +119,19 @@ void main() {
         '--enable-macos-desktop',
       ]);
 
-      expect(Config.instance.getValue('enable-web'), true);
-      expect(Config.instance.getValue('enable-linux-desktop'), true);
-      expect(Config.instance.getValue('enable-windows-desktop'), true);
-      expect(Config.instance.getValue('enable-macos-desktop'), true);
+      expect(globals.config.getValue('enable-web'), true);
+      expect(globals.config.getValue('enable-linux-desktop'), true);
+      expect(globals.config.getValue('enable-windows-desktop'), true);
+      expect(globals.config.getValue('enable-macos-desktop'), true);
 
       await commandRunner.run(<String>[
         'config', '--clear-features',
       ]);
 
-      expect(Config.instance.getValue('enable-web'), null);
-      expect(Config.instance.getValue('enable-linux-desktop'), null);
-      expect(Config.instance.getValue('enable-windows-desktop'), null);
-      expect(Config.instance.getValue('enable-macos-desktop'), null);
+      expect(globals.config.getValue('enable-web'), null);
+      expect(globals.config.getValue('enable-linux-desktop'), null);
+      expect(globals.config.getValue('enable-windows-desktop'), null);
+      expect(globals.config.getValue('enable-macos-desktop'), null);
 
       await commandRunner.run(<String>[
         'config',
@@ -142,10 +141,10 @@ void main() {
         '--no-enable-macos-desktop',
       ]);
 
-      expect(Config.instance.getValue('enable-web'), false);
-      expect(Config.instance.getValue('enable-linux-desktop'), false);
-      expect(Config.instance.getValue('enable-windows-desktop'), false);
-      expect(Config.instance.getValue('enable-macos-desktop'), false);
+      expect(globals.config.getValue('enable-web'), false);
+      expect(globals.config.getValue('enable-linux-desktop'), false);
+      expect(globals.config.getValue('enable-windows-desktop'), false);
+      expect(globals.config.getValue('enable-macos-desktop'), false);
       verifyNoAnalytics();
     }, overrides: <Type, Generator>{
       AndroidStudio: () => mockAndroidStudio,
@@ -162,7 +161,10 @@ void main() {
         '--enable-web'
       ]);
 
-      expect(testLogger.statusText, contains('You may need to restart any open editors'));
+      expect(
+        testLogger.statusText,
+        containsIgnoringWhitespace('You may need to restart any open editors'),
+      );
     }, overrides: <Type, Generator>{
       Usage: () => mockUsage,
     });
@@ -184,10 +186,22 @@ void main() {
         'config',
       ]);
 
-      expect(testLogger.statusText, contains('enable-web: true (Unavailable)'));
-      expect(testLogger.statusText, contains('enable-linux-desktop: true (Unavailable)'));
-      expect(testLogger.statusText, contains('enable-windows-desktop: true (Unavailable)'));
-      expect(testLogger.statusText, contains('enable-macos-desktop: true (Unavailable)'));
+      expect(
+        testLogger.statusText,
+        containsIgnoringWhitespace('enable-web: true (Unavailable)'),
+      );
+      expect(
+        testLogger.statusText,
+        containsIgnoringWhitespace('enable-linux-desktop: true (Unavailable)'),
+      );
+      expect(
+        testLogger.statusText,
+        containsIgnoringWhitespace('enable-windows-desktop: true (Unavailable)'),
+      );
+      expect(
+        testLogger.statusText,
+        containsIgnoringWhitespace('enable-macos-desktop: true (Unavailable)'),
+      );
       verifyNoAnalytics();
     }, overrides: <Type, Generator>{
       AndroidStudio: () => mockAndroidStudio,
@@ -200,12 +214,27 @@ void main() {
       final ConfigCommand configCommand = ConfigCommand();
       final CommandRunner<void> commandRunner = createTestCommandRunner(configCommand);
 
+      when(mockUsage.sendEvent(
+        captureAny,
+        captureAny,
+        label: captureAnyNamed('label'),
+        value: anyNamed('value'),
+        parameters: anyNamed('parameters'),
+      )).thenAnswer((Invocation invocation) async {
+        expect(mockUsage.enabled, true);
+        expect(invocation.positionalArguments, <String>['analytics', 'enabled']);
+        expect(invocation.namedArguments[#label], 'false');
+      });
+
       await commandRunner.run(<String>[
         'config',
         '--no-analytics',
       ]);
 
       expect(mockUsage.enabled, false);
+
+      // Verify that we flushed the analytics queue.
+      verify(mockUsage.ensureAnalyticsSent());
 
       // Verify that we only send the analytics disable event, and no other
       // info.
@@ -219,16 +248,6 @@ void main() {
         any,
         label: anyNamed('label'),
       ));
-
-      expect(verify(mockUsage.sendEvent(
-        captureAny,
-        captureAny,
-        label: captureAnyNamed('label'),
-        value: anyNamed('value'),
-        parameters: anyNamed('parameters'),
-      )).captured,
-        <dynamic>['analytics', 'enabled', 'false'],
-      );
     }, overrides: <Type, Generator>{
       Usage: () => mockUsage,
     });
@@ -269,6 +288,24 @@ void main() {
     }, overrides: <Type, Generator>{
       Usage: () => mockUsage,
     });
+
+    testUsingContext('analytics reported disabled when suppressed', () async {
+      final ConfigCommand configCommand = ConfigCommand();
+      final CommandRunner<void> commandRunner = createTestCommandRunner(configCommand);
+
+      mockUsage.suppressAnalytics = true;
+
+      await commandRunner.run(<String>[
+        'config',
+      ]);
+
+      expect(
+        testLogger.statusText,
+        containsIgnoringWhitespace('Analytics reporting is currently disabled'),
+      );
+    }, overrides: <Type, Generator>{
+      Usage: () => mockUsage,
+    });
   });
 }
 
@@ -287,4 +324,7 @@ class MockFlutterVersion extends Mock implements FlutterVersion {}
 class MockUsage extends Mock implements Usage {
   @override
   bool enabled = true;
+
+  @override
+  bool suppressAnalytics = false;
 }

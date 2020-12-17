@@ -6,6 +6,7 @@
 // precise contents (including especially the comments) of this file.
 
 // Examples can assume:
+// // @dart = 2.9
 // bool _visible = true;
 // class _Text extends Text {
 //   const _Text(String text) : super(text);
@@ -22,7 +23,7 @@
 /// blabla 0.0, the penzance blabla is blabla not blabla at all. Bla the blabla
 /// 1.0, the blabla is blabla blabla blabla an blabla blabla.
 ///
-/// {@tool sample}
+/// {@tool snippet}
 /// Bla blabla blabla some [Text] when the `_blabla` blabla blabla is true, and
 /// blabla it when it is blabla:
 ///
@@ -34,7 +35,7 @@
 /// ```
 /// {@end-tool}
 ///
-/// {@tool dartpad --template=stateless_widget_material}
+/// {@tool dartpad --template=stateless_widget_material_no_null_safety}
 /// Bla blabla blabla some [Text] when the `_blabla` blabla blabla is true, and
 /// blabla it when it is blabla:
 ///
@@ -54,7 +55,7 @@
 /// ```
 /// {@end-tool}
 ///
-/// {@tool sample}
+/// {@tool snippet}
 /// Bla blabla blabla some [Text] when the `_blabla` blabla blabla is true, and
 /// blabla finale blabla:
 ///
@@ -66,7 +67,7 @@
 /// ```
 /// {@end-tool}
 ///
-/// {@tool sample}
+/// {@tool snippet}
 /// regular const constructor
 ///
 /// ```dart
@@ -74,21 +75,21 @@
 /// ```
 /// {@end-tool}
 ///
-/// {@tool sample}
+/// {@tool snippet}
 /// const private constructor
 /// ```dart
 /// const             _Text('Poor wandering ones!')
 /// ```
 /// {@end-tool}
 ///
-/// {@tool sample}
+/// {@tool snippet}
 /// yet another const private constructor
 /// ```dart
 /// const        _Text.__('Poor wandering ones!')
 /// ```
 /// {@end-tool}
 ///
-/// {@tool sample}
+/// {@tool snippet}
 /// const variable
 ///
 /// ```dart
@@ -96,7 +97,7 @@
 /// ```
 /// {@end-tool}
 ///
-/// {@tool sample}
+/// {@tool snippet}
 /// more const variables
 ///
 /// ```dart

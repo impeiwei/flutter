@@ -17,17 +17,17 @@ import 'test_driver.dart';
 import 'test_utils.dart';
 
 void main() {
-  test('device.getDevices', () async {
+  testWithoutContext('device.getDevices', () async {
     final Directory tempDir = createResolvedTempDirectorySync('daemon_mode_test.');
 
     final BasicProject _project = BasicProject();
     await _project.setUpIn(tempDir);
 
-    final String flutterBin = fs.path.join(getFlutterRoot(), 'bin', 'flutter');
+    final String flutterBin = fileSystem.path.join(getFlutterRoot(), 'bin', 'flutter');
 
     const ProcessManager processManager = LocalProcessManager();
     final Process process = await processManager.start(
-      <String>[flutterBin, '--show-test-device', 'daemon'],
+      <String>[flutterBin, ...getLocalEngineArguments(), '--show-test-device', 'daemon'],
       workingDirectory: tempDir.path,
     );
 
@@ -46,7 +46,7 @@ void main() {
       'id': 1,
       'method': 'device.enable',
     })}]');
-    response = await stream.first;
+    response = await stream.firstWhere((Map<String, Object> json) => json['id'] == 1);
     expect(response['id'], 1);
     expect(response['error'], isNull);
 

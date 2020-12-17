@@ -7,7 +7,6 @@ import 'dart:ui' show Offset;
 import 'package:flutter/foundation.dart';
 
 import 'arena.dart';
-import 'constants.dart';
 import 'events.dart';
 import 'recognizer.dart';
 
@@ -43,16 +42,15 @@ enum _ForceState {
 ///  * [ForcePressGestureRecognizer.onStart], [ForcePressGestureRecognizer.onPeak],
 ///    [ForcePressGestureRecognizer.onEnd], and [ForcePressGestureRecognizer.onUpdate]
 ///    which use [ForcePressDetails].
-///  * [ForcePressUpdateDetails], the details for [ForcePressUpdateCallback].
 class ForcePressDetails {
   /// Creates details for a [GestureForcePressStartCallback],
   /// [GestureForcePressPeakCallback] or [GestureForcePressEndCallback].
   ///
   /// The [globalPosition] argument must not be null.
   ForcePressDetails({
-    @required this.globalPosition,
-    Offset localPosition,
-    @required this.pressure,
+    required this.globalPosition,
+    Offset? localPosition,
+    required this.pressure,
   }) : assert(globalPosition != null),
        assert(pressure != null),
        localPosition = localPosition ?? globalPosition;
@@ -122,13 +120,13 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
   /// to 1.0 for values of `pressure` that are between `pressureMin` and
   /// `pressureMax`.
   ///
-  /// {@macro flutter.gestures.gestureRecognizer.kind}
+  /// {@macro flutter.gestures.GestureRecognizer.kind}
   ForcePressGestureRecognizer({
     this.startPressure = 0.4,
     this.peakPressure = 0.85,
     this.interpolation = _inverseLerp,
-    Object debugOwner,
-    PointerDeviceKind kind,
+    Object? debugOwner,
+    PointerDeviceKind? kind,
   }) : assert(startPressure != null),
        assert(peakPressure != null),
        assert(interpolation != null),
@@ -142,7 +140,7 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
   ///
   /// The position of the pointer is provided in the callback's `details`
   /// argument, which is a [ForcePressDetails] object.
-  GestureForcePressStartCallback onStart;
+  GestureForcePressStartCallback? onStart;
 
   /// A pointer is in contact with the screen and is either moving on the plane
   /// of the screen, pressing the screen with varying forces or both
@@ -152,8 +150,8 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
   /// of [onStart] and/or [onPeak] and before the invocation of [onEnd], no
   /// matter what the pressure is during this time period. The position and
   /// pressure of the pointer is provided in the callback's `details` argument,
-  /// which is a [ForcePressUpdateDetails] object.
-  GestureForcePressUpdateCallback onUpdate;
+  /// which is a [ForcePressDetails] object.
+  GestureForcePressUpdateCallback? onUpdate;
 
   /// A pointer is in contact with the screen and has just pressed with a force
   /// exceeding the [peakPressure]. This is an arbitrary second level action
@@ -162,13 +160,13 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
   ///
   /// The position of the pointer is provided in the callback's `details`
   /// argument, which is a [ForcePressDetails] object.
-  GestureForcePressPeakCallback onPeak;
+  GestureForcePressPeakCallback? onPeak;
 
   /// A pointer is no longer in contact with the screen.
   ///
   /// The position of the pointer is provided in the callback's `details`
   /// argument, which is a [ForcePressDetails] object.
-  GestureForcePressEndCallback onEnd;
+  GestureForcePressEndCallback? onEnd;
 
   /// The pressure of the press required to initiate a force press.
   ///
@@ -190,7 +188,7 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
   ///
   /// This function must always return values in the range 0.0 to 1.0 given a
   /// pressure that is between the minimum and maximum pressures. It may return
-  /// [double.NaN] for values that it does not want to support.
+  /// `double.NaN` for values that it does not want to support.
   ///
   /// By default, the function is a linear interpolation; however, changing the
   /// function could be useful to accommodate variations in the way different
@@ -208,8 +206,8 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
   /// ```
   final GestureForceInterpolation interpolation;
 
-  OffsetPair _lastPosition;
-  double _lastPressure;
+  late OffsetPair _lastPosition;
+  late double _lastPressure;
   _ForceState _state = _ForceState.ready;
 
   @override
@@ -217,7 +215,7 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
     // If the device has a maximum pressure of less than or equal to 1, it
     // doesn't have touch pressure sensing capabilities. Do not participate
     // in the gesture arena.
-    if (!(event is PointerUpEvent) && event.pressureMax <= 1.0) {
+    if (event is! PointerUpEvent && event.pressureMax <= 1.0) {
       resolve(GestureDisposition.rejected);
     } else {
       startTrackingPointer(event.pointer, event.transform);
@@ -254,7 +252,7 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
         if (pressure > startPressure) {
           _state = _ForceState.started;
           resolve(GestureDisposition.accepted);
-        } else if (event.delta.distanceSquared > kTouchSlop) {
+        } else if (event.delta.distanceSquared > computeHitSlop(event.kind)) {
           resolve(GestureDisposition.rejected);
         }
       }
@@ -263,7 +261,7 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
       if (pressure > startPressure && _state == _ForceState.accepted) {
         _state = _ForceState.started;
         if (onStart != null) {
-          invokeCallback<void>('onStart', () => onStart(ForcePressDetails(
+          invokeCallback<void>('onStart', () => onStart!(ForcePressDetails(
             pressure: pressure,
             globalPosition: _lastPosition.global,
             localPosition: _lastPosition.local,
@@ -274,7 +272,7 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
          (_state == _ForceState.started)) {
         _state = _ForceState.peaked;
         if (onPeak != null) {
-          invokeCallback<void>('onPeak', () => onPeak(ForcePressDetails(
+          invokeCallback<void>('onPeak', () => onPeak!(ForcePressDetails(
             pressure: pressure,
             globalPosition: event.position,
             localPosition: event.localPosition,
@@ -284,7 +282,7 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
       if (onUpdate != null &&  !pressure.isNaN &&
          (_state == _ForceState.started || _state == _ForceState.peaked)) {
         if (onUpdate != null) {
-          invokeCallback<void>('onUpdate', () => onUpdate(ForcePressDetails(
+          invokeCallback<void>('onUpdate', () => onUpdate!(ForcePressDetails(
             pressure: pressure,
             globalPosition: event.position,
             localPosition: event.localPosition,
@@ -301,7 +299,7 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
       _state = _ForceState.accepted;
 
     if (onStart != null && _state == _ForceState.started) {
-      invokeCallback<void>('onStart', () => onStart(ForcePressDetails(
+      invokeCallback<void>('onStart', () => onStart!(ForcePressDetails(
         pressure: _lastPressure,
         globalPosition: _lastPosition.global,
         localPosition: _lastPosition.local,
@@ -318,7 +316,7 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
     }
     if (wasAccepted && onEnd != null) {
       if (onEnd != null) {
-        invokeCallback<void>('onEnd', () => onEnd(ForcePressDetails(
+        invokeCallback<void>('onEnd', () => onEnd!(ForcePressDetails(
           pressure: 0.0,
           globalPosition: _lastPosition.global,
           localPosition: _lastPosition.local,
@@ -341,7 +339,7 @@ class ForcePressGestureRecognizer extends OneSequenceGestureRecognizer {
     // If the device incorrectly reports a pressure outside of pressureMin
     // and pressureMax, we still want this recognizer to respond normally.
     if (!value.isNaN)
-      value = value.clamp(0.0, 1.0) as double;
+      value = value.clamp(0.0, 1.0);
     return value;
   }
 

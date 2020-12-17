@@ -33,18 +33,18 @@ If you want to help us triage, you are very welcome to do so!
    that everyone must be gracious, respectful, and professional. If you're helping out
    with triage, you are representing the Flutter team, and so you want to make sure to
    make a good impression!
-   
+
 3. Help out as described in our wiki: https://github.com/flutter/flutter/wiki/Triage
    You won't be able to add labels at first, so instead start by trying to
    do the other steps, e.g. trying to reproduce the problem and asking for people to
    provide enough details that you can reproduce the problem, pointing out duplicates,
    and so on. Chat on the #hackers-triage channel to let us know what you're up to!
-   
+
 4. Familiarize yourself with our
    [issue hygiene](https://github.com/flutter/flutter/wiki/Issue-hygiene) wiki page,
    which covers the meanings of some important GitHub labels and
    milestones.
- 
+
 5. Once you've been doing this for a while, someone will invite you to the flutter-hackers
    team on GitHub and you'll be able to add labels too. See the
    [contributor access](https://github.com/flutter/flutter/wiki/Contributor-access) wiki
@@ -96,6 +96,7 @@ presented.
    practice to do before coding more intricate changes.
 
 In addition to the above, there are many pages on [our
-Wiki](https://github.com/flutter/flutter/wiki/) that may be of
-interest. For a curated list of pages see the sidebar on the wiki's
-home page. They are more or less listed in order of importance.
+Wiki](https://github.com/flutter/flutter/wiki/) and an article [Contributing to Flutter:
+Getting Started](https://medium.com/@ayushbherwani/contributing-to-flutter-getting-started-a0db68cbcd5b)
+on Medium that may be of interest. For a curated list of pages see the sidebar
+on the wiki's home page. They are more or less listed in order of importance.

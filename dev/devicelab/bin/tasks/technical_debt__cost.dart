@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_devicelab/framework/framework.dart';
+import 'package:flutter_devicelab/framework/task_result.dart';
 import 'package:flutter_devicelab/framework/utils.dart';
 import 'package:path/path.dart' as path;
 
@@ -18,14 +18,15 @@ const double skipCost = 2473.0; // 20 hours: 5 to fix the issue we're ignoring, 
 const double ignoreForFileCost = 2477.0; // similar thinking as skipCost
 const double asDynamicCost = 2011.0; // a few days to refactor the code.
 const double deprecationCost = 233.0; // a few hours to remove the old code.
-const double grandfatheredDeprecationCost = 9973.0; // a couple of weeks.
+const double legacyDeprecationCost = 9973.0; // a couple of weeks.
 
 final RegExp todoPattern = RegExp(r'(?://|#) *TODO');
 final RegExp ignorePattern = RegExp(r'// *ignore:');
 final RegExp ignoreForFilePattern = RegExp(r'// *ignore_for_file:');
 final RegExp asDynamicPattern = RegExp(r'\bas dynamic\b');
 final RegExp deprecationPattern = RegExp(r'^ *@[dD]eprecated');
-const String grandfatheredDeprecationPattern = '// ignore: flutter_deprecation_syntax, https';
+const Pattern globalsPattern = 'globals.';
+const String legacyDeprecationPattern = '// ignore: flutter_deprecation_syntax, https';
 
 Future<double> findCostsForFile(File file) async {
   if (path.extension(file.path) == '.py')
@@ -36,7 +37,7 @@ Future<double> findCostsForFile(File file) async {
     return 0.0;
   final bool isTest = file.path.endsWith('_test.dart');
   double total = 0.0;
-  for (String line in await file.readAsLines()) {
+  for (final String line in await file.readAsLines()) {
     if (line.contains(todoPattern))
       total += todoCost;
     if (line.contains(ignorePattern))
@@ -47,10 +48,21 @@ Future<double> findCostsForFile(File file) async {
       total += asDynamicCost;
     if (line.contains(deprecationPattern))
       total += deprecationCost;
-    if (line.contains(grandfatheredDeprecationPattern))
-      total += grandfatheredDeprecationCost;
+    if (line.contains(legacyDeprecationPattern))
+      total += legacyDeprecationCost;
     if (isTest && line.contains('skip:'))
       total += skipCost;
+  }
+  return total;
+}
+
+Future<int> findGlobalsForFile(File file) async {
+  if (path.extension(file.path) != '.dart')
+    return 0;
+  int total = 0;
+  for (final String line in await file.readAsLines()) {
+    if (line.contains(globalsPattern))
+      total += 1;
   }
   return total;
 }
@@ -62,8 +74,23 @@ Future<double> findCostsForRepo() async {
     workingDirectory: flutterDirectory.path,
   );
   double total = 0.0;
-  await for (String entry in git.stdout.transform<String>(utf8.decoder).transform<String>(const LineSplitter()))
+  await for (final String entry in git.stdout.transform<String>(utf8.decoder).transform<String>(const LineSplitter()))
     total += await findCostsForFile(File(path.join(flutterDirectory.path, entry)));
+  final int gitExitCode = await git.exitCode;
+  if (gitExitCode != 0)
+    throw Exception('git exit with unexpected error code $gitExitCode');
+  return total;
+}
+
+Future<int> findGlobalsForTool() async {
+  final Process git = await startProcess(
+    'git',
+    <String>['ls-files', '--full-name', path.join(flutterDirectory.path, 'packages', 'flutter_tools')],
+    workingDirectory: flutterDirectory.path,
+  );
+  int total = 0;
+  await for (final String entry in git.stdout.transform<String>(utf8.decoder).transform<String>(const LineSplitter()))
+    total += await findGlobalsForFile(File(path.join(flutterDirectory.path, entry)));
   final int gitExitCode = await git.exitCode;
   if (gitExitCode != 0)
     throw Exception('git exit with unexpected error code $gitExitCode');
@@ -95,6 +122,7 @@ Future<int> countConsumerDependencies() async {
 const String _kCostBenchmarkKey = 'technical_debt_in_dollars';
 const String _kNumberOfDependenciesKey = 'dependencies_count';
 const String _kNumberOfConsumerDependenciesKey = 'consumer_dependencies_count';
+const String _kNumberOfFlutterToolGlobals = 'flutter_tool_globals_count';
 
 Future<void> main() async {
   await task(() async {
@@ -103,11 +131,13 @@ Future<void> main() async {
         _kCostBenchmarkKey: await findCostsForRepo(),
         _kNumberOfDependenciesKey: await countDependencies(),
         _kNumberOfConsumerDependenciesKey: await countConsumerDependencies(),
+        _kNumberOfFlutterToolGlobals: await findGlobalsForTool(),
       },
       benchmarkScoreKeys: <String>[
         _kCostBenchmarkKey,
         _kNumberOfDependenciesKey,
         _kNumberOfConsumerDependenciesKey,
+        _kNumberOfFlutterToolGlobals,
       ],
     );
   });

@@ -5,6 +5,7 @@
 import 'package:meta/meta.dart';
 
 import '../base/context.dart';
+import '../base/net.dart';
 import '../device.dart';
 import '../project.dart';
 import '../resident_runner.dart';
@@ -23,6 +24,7 @@ abstract class WebRunnerFactory {
     @required FlutterProject flutterProject,
     @required bool ipv6,
     @required DebuggingOptions debuggingOptions,
-    @required List<String> dartDefines,
+    @required UrlTunneller urlTunneller,
+    bool machine = false,
   });
 }

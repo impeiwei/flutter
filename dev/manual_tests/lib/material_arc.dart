@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -139,7 +136,7 @@ class _PointDemoState extends State<_PointDemo> {
     if (_dragTarget != null)
       return _IgnoreDrag();
 
-    final RenderBox box = _painterKey.currentContext.findRenderObject();
+    final RenderBox box = _painterKey.currentContext.findRenderObject() as RenderBox;
     final double startOffset = (box.localToGlobal(_begin) - position).distanceSquared;
     final double endOffset = (box.localToGlobal(_end) - position).distanceSquared;
     setState(() {
@@ -194,8 +191,7 @@ class _PointDemoState extends State<_PointDemo> {
         ImmediateMultiDragGestureRecognizer: GestureRecognizerFactoryWithHandlers<ImmediateMultiDragGestureRecognizer>(
           () => ImmediateMultiDragGestureRecognizer(),
           (ImmediateMultiDragGestureRecognizer instance) {
-            instance
-              ..onStart = _handleOnStart;
+            instance.onStart = _handleOnStart;
           },
         ),
       },
@@ -307,7 +303,7 @@ class _RectangleDemoState extends State<_RectangleDemo> {
     if (_dragTarget != null)
       return _IgnoreDrag();
 
-    final RenderBox box = _painterKey.currentContext.findRenderObject();
+    final RenderBox box = _painterKey.currentContext.findRenderObject() as RenderBox;
     final double startOffset = (box.localToGlobal(_begin.center) - position).distanceSquared;
     final double endOffset = (box.localToGlobal(_end.center) - position).distanceSquared;
     setState(() {
@@ -367,8 +363,7 @@ class _RectangleDemoState extends State<_RectangleDemo> {
         ImmediateMultiDragGestureRecognizer: GestureRecognizerFactoryWithHandlers<ImmediateMultiDragGestureRecognizer>(
           () => ImmediateMultiDragGestureRecognizer(),
           (ImmediateMultiDragGestureRecognizer instance) {
-            instance
-              ..onStart = _handleOnStart;
+            instance.onStart = _handleOnStart;
           },
         ),
       },
@@ -475,17 +470,7 @@ class _AnimationDemoState extends State<AnimationDemo> with TickerProviderStateM
   }
 }
 
-// Sets a platform override for desktop to avoid exceptions. See
-// https://flutter.dev/desktop#target-platform-override for more info.
-// TODO(gspencergoog): Remove once TargetPlatform includes all desktop platforms.
-void _enablePlatformOverrideForDesktop() {
-  if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
-    debugDefaultTargetPlatformOverride = TargetPlatform.fuchsia;
-  }
-}
-
 void main() {
-  _enablePlatformOverrideForDesktop();
   runApp(const MaterialApp(
     home: AnimationDemo(),
   ));

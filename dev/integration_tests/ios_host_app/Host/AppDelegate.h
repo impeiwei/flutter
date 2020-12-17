@@ -6,5 +6,8 @@
 #import <Flutter/Flutter.h>
 
 @interface AppDelegate : FlutterAppDelegate
-@end
 
+@property(nonatomic, strong) FlutterEngine* engine;
+@property(nonatomic, strong) FlutterBasicMessageChannel* reloadMessageChannel;
+
+@end

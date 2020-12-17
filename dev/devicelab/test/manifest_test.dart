@@ -19,7 +19,7 @@ void main() {
       expect(task.stage, 'devicelab');
       expect(task.requiredAgentCapabilities, <String>['linux/android']);
 
-      for (ManifestTask task in manifest.tasks) {
+      for (final ManifestTask task in manifest.tasks) {
         final File taskFile = File('bin/tasks/${task.name}.dart');
         expect(taskFile.existsSync(), true,
           reason: 'File ${taskFile.path} corresponding to manifest task "${task.name}" not found');
@@ -103,7 +103,7 @@ tasks:
 
     testManifestError(
       'invalid task property',
-      'Unrecognized property "bar" in Value of task "foo". Allowed properties: description, stage, required_agent_capabilities, flaky, timeout_in_minutes',
+      'Unrecognized property "bar" in Value of task "foo". Allowed properties: description, stage, required_agent_capabilities, flaky, timeout_in_minutes, on_luci',
       '''
       tasks:
         foo:
